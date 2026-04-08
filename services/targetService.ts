@@ -1,7 +1,7 @@
 import { DiscoveryResponse, TargetCandidate } from '../types';
 
 // ===================== 【关键】和后端 server.py 完全对齐 =====================
-const API_BASE_URL = 'http://127.0.0.1:3000/api';
+const API_BASE_URL = '=/api';
 const OPENTARGETS_API_URL = `${API_BASE_URL}/opentargets/graphql`; // 必须和后端 route 一致
 const SCORE_API_URL = `${API_BASE_URL}/score-target`;
 const LITERATURE_API_URL = `${API_BASE_URL}/target-literature`;
