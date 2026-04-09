@@ -1,16 +1,15 @@
-
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Share2, ArrowRight, Activity, Database, Zap, ChevronRight, Info, Loader2, X, FileText, ExternalLink, Download, Milestone, Dna } from 'lucide-react';
+import { Search, Share2, ArrowRight, Activity, Database, Zap, ChevronRight, Info, Loader2, X, FileText, ExternalLink, Download, Milestone, Dna, CheckCircle2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Cell } from 'recharts';
 
 const data = [
-  { name: '炎症性', count: 850, color: '#3b82f6' },
-  { name: '肿瘤性', count: 640, color: '#ec4899' },
-  { name: '附属器', count: 520, color: '#6366f1' },
-  { name: '色素性', count: 410, color: '#8b5cf6' },
-  { name: '感染性', count: 320, color: '#f43f5e' },
-  { name: '免疫/遗传', count: 280, color: '#f97316' },
+  { name: '炎症性', count: 1120, color: '#3b82f6' },
+  { name: '肿瘤性', count: 890, color: '#ec4899' },
+  { name: '附属器', count: 760, color: '#6366f1' },
+  { name: '色素性', count: 610, color: '#8b5cf6' },
+  { name: '感染性', count: 480, color: '#f43f5e' },
+  { name: '免疫/遗传', count: 420, color: '#f97316' },
 ];
 
 const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode; color: string; description?: string }> = ({ title, value, icon, color, description }) => (
@@ -18,7 +17,7 @@ const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode; 
     <div className="relative z-10">
       <div className="flex items-center gap-2 mb-1">
         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{title}</p>
-        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
       </div>
       <h3 className="text-3xl font-black text-slate-800 tracking-tight">{value}</h3>
       {description && <p className="text-[9px] text-slate-400 mt-2 font-bold flex items-center gap-1"><Info className="w-3 h-3" /> {description}</p>}
@@ -34,9 +33,10 @@ const Dashboard: React.FC = () => {
     <div className="max-w-6xl mx-auto space-y-8 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full w-fit text-[10px] font-black uppercase tracking-widest border border-indigo-100">
-            <Activity className="w-3 h-3" />
-            系统实时运行中 - 2024.Q3 数据已同步
+          {/* “系统运行正常” */}
+          <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full w-fit text-[10px] font-black uppercase tracking-widest border border-emerald-100">
+            <CheckCircle2 className="w-3 h-3" />
+            系统运行正常
           </div>
           <h1 className="text-4xl font-black text-slate-800 tracking-tight">皮肤病药研智能中心</h1>
           <p className="text-slate-500 font-medium max-w-2xl">整合全球多组学数据与学术文献，加速皮肤科从靶点识别到先导化合物发现的临床前研究。</p>
@@ -44,9 +44,10 @@ const Dashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard title="皮肤病知识节点" value="1,420万+" description="最后同步: 实时同步中" icon={<Database className="w-6 h-6 text-blue-600" />} color="bg-blue-50" />
-        <StatCard title="皮肤候选靶点" value="2,845" description="最后同步: 5分钟前" icon={<Activity className="w-6 h-6 text-emerald-600" />} color="bg-emerald-50" />
-        <StatCard title="皮肤关联基因" value="12,400+" description="最后同步: 1小时前" icon={<Dna className="w-6 h-6 text-amber-600" />} color="bg-amber-50" />
+        {/* 基线描述 */}
+        <StatCard title="皮肤病知识节点" value="2,150万+" description="基线版本: 2026.Q1" icon={<Database className="w-6 h-6 text-blue-600" />} color="bg-blue-50" />
+        <StatCard title="皮肤候选靶点" value="3,412" description="系统定期自动校验" icon={<Activity className="w-6 h-6 text-emerald-600" />} color="bg-emerald-50" />
+        <StatCard title="皮肤关联基因" value="15,800+" description="多组学数据整合" icon={<Dna className="w-6 h-6 text-amber-600" />} color="bg-amber-50" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -71,7 +72,7 @@ const Dashboard: React.FC = () => {
           <h3 className="text-xl font-black text-slate-800 mb-8">全球药研文献与专利指数</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={[{ day: '2019', val: 120 }, { day: '2020', val: 320 }, { day: '2021', val: 480 }, { day: '2022', val: 750 }, { day: '2023', val: 1100 }, { day: '2024', val: 1420 }]}>
+              <AreaChart data={[{ day: '2020', val: 320 }, { day: '2021', val: 480 }, { day: '2022', val: 750 }, { day: '2023', val: 1100 }, { day: '2024', val: 1420 }, { day: '2025', val: 1850 }, { day: '2026', val: 2340 }]}>
                 <defs>
                   <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
@@ -93,20 +94,19 @@ const Dashboard: React.FC = () => {
           <div className="space-y-4">
             <div className="p-4 bg-indigo-100 text-indigo-600 rounded-2xl w-fit"><Search className="w-7 h-7" /></div>
             <h3 className="text-2xl font-black text-slate-800">靶点识别</h3>
-            <p className="text-slate-500 text-sm font-medium">深度识别 10-12 个核心靶点，采用 DermAI-Score 验证系统。</p>
+            <p className="text-slate-500 text-sm font-medium">深度挖掘皮肤疾病核心靶点，采用 AI 多维打分引擎验证临床证据。</p>
           </div>
           <ArrowRight className="w-7 h-7 text-slate-300 group-hover:text-indigo-500 group-hover:translate-x-2 transition-all self-end" />
         </Link>
         <Link to="/knowledge-graph" className="group p-10 rounded-[2.5rem] bg-white border border-slate-200 hover:border-emerald-500 hover:shadow-2xl transition-all flex flex-col justify-between h-72">
           <div className="space-y-4">
             <div className="p-4 bg-emerald-100 text-emerald-600 rounded-2xl w-fit"><Share2 className="w-7 h-7" /></div>
-            <h3 className="text-2xl font-black text-slate-800">皮肤图谱</h3>
-            <p className="text-slate-500 text-sm font-medium">可视化皮损微环境下的关键因子与蛋白信号通路。</p>
+            <h3 className="text-2xl font-black text-slate-800">皮肤知识图谱</h3>
+            <p className="text-slate-500 text-sm font-medium">可视化皮损微环境下的关键因子与蛋白信号通路</p>
           </div>
           <ArrowRight className="w-7 h-7 text-slate-300 group-hover:text-emerald-500 group-hover:translate-x-2 transition-all self-end" />
         </Link>
       </div>
-
     </div>
   );
 };
