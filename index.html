@@ -6,6 +6,8 @@
     <title>DermAI 皮肤药研平台</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    
     <script type="importmap">
     {
       "imports": {
@@ -22,17 +24,13 @@
 </head>
 <body>
     <div id="root"></div>
-    <script type="text/babel" data-type="module" data-presets="react,typescript">
+    <script type="text/babel" data-type="module" data-presets="env,react,typescript">
         import React from 'react';
         import ReactDOM from 'react-dom/client';
         import App from './App.tsx'; 
 
-        try {
-            const root = ReactDOM.createRoot(document.getElementById('root'));
-            root.render(<App />);
-        } catch (e) {
-            console.error("DermAI Render Error:", e);
-        }
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
