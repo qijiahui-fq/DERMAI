@@ -25,10 +25,11 @@
     <script type="text/babel" data-type="module" data-presets="react">
         import React from 'react';
         import ReactDOM from 'react-dom/client';
-        // 🚀 关键：这里改成 .jsx
+        // 🚀 这里就是解决 404 的关键：指向你改名后的新文件
         import App from './App.jsx'; 
 
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
