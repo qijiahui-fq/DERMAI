@@ -1,5 +1,8 @@
+// @ts-nocheck
 import React, { useState, useEffect, useRef } from 'react';
+// 在 index.html 的 importmap 里定义了它
 import axios from 'axios';
+// importmap 映射
 import ForceGraph2D from 'react-force-graph-2d'; 
 import { Search, Filter, Download, RefreshCw, Info, AlertCircle, BookOpen, Layers } from 'lucide-react';
 
