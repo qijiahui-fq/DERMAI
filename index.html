@@ -8,16 +8,19 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-router-dom/6.3.0/react-router-dom.production.min.js"></script>
+    <script src="https://unpkg.com/react-router-dom@6.3.0/dist/umd/react-router-dom.production.min.js"></script>
 </head>
 <body>
     <div id="root"></div>
+
     <script type="text/babel">
-        const initDermAI = () => {
-            // 🚀 核心纠错：ReactRouterDom 在 UMD 模式下可能叫 ReactRouter
+        // 🚀 循环检查机制：确保所有库都到位了再开车
+        const startSystem = () => {
             const RouterLib = window.ReactRouterDom || window.ReactRouter;
-            if (!RouterLib) {
-                console.error("ReactRouterDom 依然未加载，尝试重新初始化...");
+            
+            if (!window.React || !window.ReactDOM || !RouterLib) {
+                console.log("等待资源中...");
+                setTimeout(startSystem, 200); // 没加载完？200ms 后再试
                 return;
             }
 
@@ -30,34 +33,45 @@
                     fetch(`./pages/pages/${name}.jsx`)
                         .then(res => res.text())
                         .then(code => {
-                            const result = Babel.transform(code, { presets: ['react'] }).code;
+                            // 暴力清理代码中的 import 语句，防止浏览器内核报错
+                            const cleanCode = code.replace(/import[\s\S]*?from\s+['"].*?['"];?/g, '');
+                            const result = Babel.transform(cleanCode, { presets: ['react'] }).code;
                             const exports = {};
                             const module = { exports };
                             new Function('React', 'exports', 'module', result)(React, exports, module);
                             setComp(() => module.exports.default || module.exports);
                         })
-                        .catch(err => console.error(name + "加载失败", err));
+                        .catch(err => console.error(name + " 载入故障", err));
                 }, [name]);
-                return Comp ? <Comp /> : <div className="p-20 text-center text-indigo-500 font-bold animate-pulse">DermAI 正在提取皮科药研逻辑...</div>;
+
+                return Comp ? <Comp /> : (
+                    <div className="flex h-screen items-center justify-center bg-slate-50">
+                        <div className="text-center">
+                            <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                            <p className="text-indigo-600 font-bold tracking-widest">DERMAI 系统初始化...</p>
+                        </div>
+                    </div>
+                );
             };
 
             const App = () => (
                 <HashRouter>
                     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-                        <nav className="bg-white border-b p-4 flex justify-between items-center shadow-sm">
+                        <nav className="bg-white border-b px-6 py-4 flex justify-between items-center shadow-sm">
                             <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 bg-indigo-600 rounded-lg"></div>
-                                <span className="text-2xl font-black text-slate-800 tracking-tighter">DermAI</span>
+                                <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center text-white font-bold">D</div>
+                                <span className="text-xl font-black text-slate-800">DermAI</span>
                             </div>
-                            <div className="flex gap-6 font-bold text-sm">
-                                <Link to="/" className="text-slate-500 hover:text-indigo-600">药研中心</Link>
-                                <Link to="/target-id" className="text-slate-500 hover:text-indigo-600">靶点识别</Link>
+                            <div className="flex gap-8 text-sm font-bold uppercase tracking-wider">
+                                <Link to="/" className="text-slate-500 hover:text-indigo-600 transition-colors">药研中心</Link>
+                                <Link to="/target-id" className="text-slate-500 hover:text-indigo-600 transition-colors">靶点识别</Link>
                             </div>
                         </nav>
                         <main className="flex-1">
                             <Routes>
                                 <Route path="/" element={<PageLoader name="Dashboard" />} />
                                 <Route path="/target-id" element={<PageLoader name="TargetID" />} />
+                                <Route path="*" element={<PageLoader name="Dashboard" />} />
                             </Routes>
                         </main>
                     </div>
@@ -65,12 +79,11 @@
             );
 
             ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+            console.log("DermAI: 核心逻辑已激活");
         };
 
-        // 确保所有资源加载完成
-        window.addEventListener('load', () => {
-            setTimeout(initDermAI, 500); // 额外给 500ms 缓冲，确保全局变量挂载完成
-        });
+        // 立即启动检查
+        startSystem();
     </script>
 </body>
 </html>
