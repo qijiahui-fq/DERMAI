@@ -8,12 +8,19 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     
+    <script>
+      // 强制定义环境，防止某些库寻找 Node.js 变量
+      window.process = { env: { NODE_ENV: 'production' } };
+      window.exports = {};
+      window.module = { exports: window.exports };
+    </script>
+
     <script type="importmap">
     {
       "imports": {
-        "react": "https://esm.sh/react@19.0.0",
-        "react-dom": "https://esm.sh/react-dom@19.0.0",
-        "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+        "react": "https://esm.sh/react@19.0.0?dev",
+        "react-dom": "https://esm.sh/react-dom@19.0.0?dev",
+        "react-dom/client": "https://esm.sh/react-dom@19.0.0/client?dev",
         "lucide-react": "https://esm.sh/lucide-react@0.462.0",
         "react-router-dom": "https://esm.sh/react-router-dom@6.28.0",
         "recharts": "https://esm.sh/recharts@2.13.3",
@@ -27,21 +34,12 @@
     <div id="root"></div>
 
     <script type="text/babel" data-type="module" data-presets="react,typescript">
-        // 强制防止任何转换导致的 require 报错
-        window.module = { exports: {} };
-        window.exports = window.module.exports;
-
         import React from 'react';
         import ReactDOM from 'react-dom/client';
         import App from './App.tsx'; 
 
-        try {
-            const root = ReactDOM.createRoot(document.getElementById('root'));
-            root.render(<App />);
-            console.log("DermAI: System initialized on GitHub Pages.");
-        } catch (e) {
-            console.error("DermAI Bootstrap Error:", e);
-        }
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
