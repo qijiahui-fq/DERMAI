@@ -4,53 +4,73 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DermAI 皮肤药研平台</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@19.0.0",
-        "react-dom": "https://esm.sh/react-dom@19.0.0",
-        "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-        "lucide-react": "https://esm.sh/lucide-react@0.462.0",
-        "react-router-dom": "https://esm.sh/react-router-dom@6.28.0",
-        "recharts": "https://esm.sh/recharts@2.13.3",
-        "axios": "https://esm.sh/axios@1.7.9"
-      }
-    }
-    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-router-dom/6.3.0/react-router-dom.production.min.js"></script>
 </head>
 <body>
     <div id="root"></div>
+    <script type="text/babel">
+        const initDermAI = () => {
+            // 🚀 核心纠错：ReactRouterDom 在 UMD 模式下可能叫 ReactRouter
+            const RouterLib = window.ReactRouterDom || window.ReactRouter;
+            if (!RouterLib) {
+                console.error("ReactRouterDom 依然未加载，尝试重新初始化...");
+                return;
+            }
 
-    <script type="text/babel" data-presets="react,typescript">
-        import React from 'react';
-        import ReactDOM from 'react-dom/client';
-        import { HashRouter, Routes, Route } from 'react-router-dom';
+            const { useState, useEffect } = React;
+            const { HashRouter, Routes, Route, Link } = RouterLib;
 
-        // 引入你的页面（只要这些文件在 pages/ 目录下且后缀是 .jsx）
-        // 如果这里还报 MIME 错误，Babel 会尝试通过 fetch 抓取并就地翻译
-        import Dashboard from './pages/Dashboard.jsx';
-        import TargetID from './pages/TargetID.jsx';
-        import KnowledgeGraph from './pages/KnowledgeGraph.jsx';
+            const PageLoader = ({ name }) => {
+                const [Comp, setComp] = useState(null);
+                useEffect(() => {
+                    fetch(`./pages/pages/${name}.jsx`)
+                        .then(res => res.text())
+                        .then(code => {
+                            const result = Babel.transform(code, { presets: ['react'] }).code;
+                            const exports = {};
+                            const module = { exports };
+                            new Function('React', 'exports', 'module', result)(React, exports, module);
+                            setComp(() => module.exports.default || module.exports);
+                        })
+                        .catch(err => console.error(name + "加载失败", err));
+                }, [name]);
+                return Comp ? <Comp /> : <div className="p-20 text-center text-indigo-500 font-bold animate-pulse">DermAI 正在提取皮科药研逻辑...</div>;
+            };
 
-        const App = () => (
-            <HashRouter>
-                <div className="min-h-screen bg-slate-50 flex flex-col">
-                    <main className="flex-1">
-                        <Routes>
-                            <Route path="/" element={<Dashboard />} />
-                            <Route path="/target-id" element={<TargetID />} />
-                            <Route path="/knowledge-graph" element={<KnowledgeGraph />} />
-                            <Route path="*" element={<Dashboard />} />
-                        </Routes>
-                    </main>
-                </div>
-            </HashRouter>
-        );
+            const App = () => (
+                <HashRouter>
+                    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+                        <nav className="bg-white border-b p-4 flex justify-between items-center shadow-sm">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 bg-indigo-600 rounded-lg"></div>
+                                <span className="text-2xl font-black text-slate-800 tracking-tighter">DermAI</span>
+                            </div>
+                            <div className="flex gap-6 font-bold text-sm">
+                                <Link to="/" className="text-slate-500 hover:text-indigo-600">药研中心</Link>
+                                <Link to="/target-id" className="text-slate-500 hover:text-indigo-600">靶点识别</Link>
+                            </div>
+                        </nav>
+                        <main className="flex-1">
+                            <Routes>
+                                <Route path="/" element={<PageLoader name="Dashboard" />} />
+                                <Route path="/target-id" element={<PageLoader name="TargetID" />} />
+                            </Routes>
+                        </main>
+                    </div>
+                </HashRouter>
+            );
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+            ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+        };
+
+        // 确保所有资源加载完成
+        window.addEventListener('load', () => {
+            setTimeout(initDermAI, 500); // 额外给 500ms 缓冲，确保全局变量挂载完成
+        });
     </script>
 </body>
 </html>
