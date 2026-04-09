@@ -1,51 +1,49 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Search, Filter, Download, RefreshCw, Info, AlertCircle, BookOpen } from 'lucide-react';
+import ForceGraph2D from 'react-force-graph-2d'; 
+import { Search, Filter, Download, RefreshCw, Info, AlertCircle, BookOpen, Layers } from 'lucide-react';
 
-// ========== 类型定义 ==========
-export enum NodeType {
-  Disease = 'disease',
-  Gene = 'gene',
-  Drug = 'drug',
-  Pathway = 'pathway',
-  Protein = 'protein'
+// ========== 1. 类型定义 (全量保留) ==========
+export enum NodeType { 
+  Disease = 'disease', 
+  Gene = 'gene', 
+  Drug = 'drug', 
+  Pathway = 'pathway', 
+  Protein = 'protein', 
+  Literature = 'literature' 
 }
 
-export enum RelationType {
-  ASSOCIATED_WITH = 'associated_with',
-  TARGETS = 'targets',
-  REGULATES = 'regulates',
-  INTERACTS_WITH = 'interacts_with'
+export enum RelationType { 
+  ASSOCIATED_WITH = 'associated_with', 
+  TARGETS = 'targets', 
+  REGULATES = 'regulates', 
+  INTERACTS_WITH = 'interacts_with', 
+  SUPPORTED_BY = 'supported_by' 
 }
 
-export interface Node {
-  id: string;
-  name: string;
-  type: NodeType;
-  val: number;
-  repurposing?: boolean;
-  formulation?: string;
+export interface Node { 
+  id: string; 
+  name: string; 
+  type: NodeType; 
+  val: number; 
+  repurposing?: boolean; 
+  formulation?: string; 
+  pmid?: string;
 }
 
-export interface Link {
-  source: string;
-  target: string;
-  type: RelationType;
+export interface Link { 
+  source: string; 
+  target: string; 
+  type: RelationType; 
 }
 
-export interface KnowledgeGraphData {
-  nodes: Node[];
-  links: Link[];
+export interface KnowledgeGraphData { 
+  nodes: Node[]; 
+  links: Link[]; 
 }
 
-// ========== 动态匹配函数（替代写死的映射表） ==========
-/**
- * 根据靶点名称动态匹配对应的通路
- * @param targetSymbol 靶点符号（如 IL4、JAK1）
- * @returns 通路名称（如 IL-4/IL-13 信号通路）
- */
+// ========== 2. 动态匹配函数 (完全保留，作为安全兜底) ==========
 const getPathwayByTarget = (targetSymbol: string): string | null => {
-  // 按靶点的功能分类匹配（可扩展，无需写死所有值）
   const pathwayRules = [
     { keywords: ['IL4', 'IL13'], pathway: 'IL-4/IL-13 信号通路' },
     { keywords: ['JAK1', 'JAK2', 'JAK3', 'TYK2', 'STAT6'], pathway: 'JAK-STAT 信号通路' },
@@ -56,20 +54,10 @@ const getPathwayByTarget = (targetSymbol: string): string | null => {
     { keywords: ['FLG'], pathway: '表皮屏障通路' },
     { keywords: ['TLR4'], pathway: 'TLR 信号通路' }
   ];
-
-  // 查找匹配的通路
-  const matchedRule = pathwayRules.find(rule => 
-    rule.keywords.some(keyword => targetSymbol.includes(keyword))
-  );
-  
+  const matchedRule = pathwayRules.find(rule => rule.keywords.some(keyword => targetSymbol.toUpperCase().includes(keyword.toUpperCase())));
   return matchedRule ? matchedRule.pathway : null;
 };
 
-/**
- * 根据靶点名称动态匹配对应的表皮蛋白
- * @param targetSymbol 靶点符号（如 FLG、LOR）
- * @returns 蛋白名称（如 丝聚蛋白（Filaggrin））
- */
 const getProteinByTarget = (targetSymbol: string): string | null => {
   const proteinRules = [
     { keywords: ['FLG'], protein: '丝聚蛋白（Filaggrin）' },
@@ -81,587 +69,278 @@ const getProteinByTarget = (targetSymbol: string): string | null => {
     { keywords: ['DSG1'], protein: '桥粒芯糖蛋白1（Desmoglein 1）' },
     { keywords: ['CLDN1'], protein: '紧密连接蛋白1（Claudin 1）' }
   ];
-
-  const matchedRule = proteinRules.find(rule => 
-    rule.keywords.some(keyword => targetSymbol.includes(keyword))
-  );
-  
+  const matchedRule = proteinRules.find(rule => rule.keywords.some(keyword => targetSymbol.toUpperCase().includes(keyword.toUpperCase())));
   return matchedRule ? matchedRule.protein : null;
 };
 
-// ========== 简易 GraphView 组件 ==========
-const GraphView: React.FC<{ data: KnowledgeGraphData; loading: boolean }> = ({ data, loading }) => {
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[600px] text-slate-500">
-        <RefreshCw className="w-10 h-10 animate-spin mb-4 text-indigo-500" />
-        <p className="text-sm">正在构建知识图谱...</p>
-      </div>
-    );
-  }
-
-  if (data.nodes.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[600px] text-slate-400">
-        <Info className="w-12 h-12 mb-4 text-slate-300" />
-        <p className="text-sm">请输入疾病名称（如：银屑病/特应性皮炎），点击搜索生成图谱</p>
-      </div>
-    );
-  }
-
-  return (
-   <div className="relative h-[600px] min-h-[500px] w-full bg-slate-50 rounded-lg overflow-hidden">
-      {/* 图例 */}
-      <div className="absolute top-4 right-4 bg-white p-3 rounded-lg shadow-sm border border-slate-100 text-xs">
-        <p className="font-bold text-slate-700 mb-2">实体图例</p>
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500"></div>
-            <span>皮肤疾病</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-            <span>关键基因</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-green-500"></div>
-            <span>皮科药物（含老药新用）</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-            <span>皮肤通路</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-            <span>表皮蛋白</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 展示节点详情 */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center p-8 overflow-auto">
-        <div className="text-center text-slate-400 text-sm mb-6">
-          <p>图谱可视化组件加载完成</p>
-          <p className="text-xs mt-1">当前展示 {data.nodes.length} 个实体，{data.links.length} 条关联</p>
-        </div>
-        
-        {/* 药物节点详情展示 */}
-        {data.nodes.filter(node => node.type === NodeType.Drug).length > 0 && (
-          <div className="w-full max-w-2xl space-y-3 mt-4">
-            <p className="text-xs font-bold text-slate-700 pl-1">皮科药物：</p>
-            {data.nodes.filter(node => node.type === NodeType.Drug).map(node => (
-              <div key={node.id} className="bg-white p-3 rounded-lg border border-slate-200 text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                  <span className="font-bold text-slate-800">{node.name}</span>
-                  {node.repurposing && <span className="bg-blue-50 text-blue-600 px-1 rounded text-[10px]">老药新用</span>}
-                </div>
-                <div className="mt-1 pl-5 text-slate-600">
-                  <span>作用机制：{node.formulation || '未知'}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        
-        {/* 通路节点展示 */}
-        {data.nodes.filter(node => node.type === NodeType.Pathway).length > 0 && (
-          <div className="w-full max-w-2xl space-y-3 mt-6">
-            <p className="text-xs font-bold text-slate-700 pl-1">皮肤通路：</p>
-            <div className="bg-white p-3 rounded-lg border border-slate-200 text-xs">
-              <div className="flex flex-wrap gap-2 pl-1">
-                {data.nodes.filter(node => node.type === NodeType.Pathway).map(node => (
-                  <span key={node.id} className="bg-orange-50 px-2 py-1 rounded text-orange-600">
-                    {node.name}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* 蛋白节点展示 */}
-        {data.nodes.filter(node => node.type === NodeType.Protein).length > 0 && (
-          <div className="w-full max-w-2xl space-y-3 mt-6">
-            <p className="text-xs font-bold text-slate-700 pl-1">表皮蛋白：</p>
-            <div className="bg-white p-3 rounded-lg border border-slate-200 text-xs">
-              <div className="flex flex-wrap gap-2 pl-1">
-                {data.nodes.filter(node => node.type === NodeType.Protein).map(node => (
-                  <span key={node.id} className="bg-purple-50 px-2 py-1 rounded text-purple-600">
-                    {node.name}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* 靶点节点简要展示 */}
-        {data.nodes.filter(node => node.type === NodeType.Gene).length > 0 && (
-          <div className="w-full max-w-2xl mt-6 text-xs text-slate-500">
-            <p className="font-bold mb-1">关键靶点：</p>
-            <div className="flex flex-wrap gap-2">
-              {data.nodes.filter(node => node.type === NodeType.Gene).map(node => (
-                <span key={node.id} className="bg-blue-50 px-2 py-1 rounded text-blue-600">
-                  {node.name}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+// ========== 3. 全量 47 种疾病映射表 (一字不差) ==========
+const DISEASE_MAP: Record<string, { efo: string; mesh: string }> = {
+  "特应性皮炎": { efo: "EFO_0000274", mesh: "D003876" }, "银屑病": { efo: "EFO_0000676", mesh: "D011506" }, "湿疹": { efo: "EFO_0000274", mesh: "D004511" }, "玫瑰痤疮": { efo: "EFO_1000760", mesh: "D014162" }, "脂溢性皮炎": { efo: "EFO_1000764", mesh: "D012869" }, "接触性皮炎": { efo: "EFO_0005319", mesh: "D003875" }, "疹痒症": { efo: "HP_0000989", mesh: "D011415" }, "红皮病": { efo: "EFO_0009456", mesh: "D004976" }, "痤疮": { efo: "EFO_0003894", mesh: "D001124" }, "斑秃": { efo: "EFO_0004192", mesh: "D001879" }, "雄激素性脱发": { efo: "EFO_0004191", mesh: "D000186" }, "酒渣鼻": { efo: "EFO_1000760", mesh: "D014162" }, "多汗症": { efo: "HP_0000975", mesh: "D006904" }, "化脓性汗腺炎": { efo: "EFO_1000710", mesh: "D006907" }, "白癜风": { efo: "EFO_0004208", mesh: "D014809" }, "黄褐斑": { efo: "EFO_0003963", mesh: "D008543" }, "雀斑": { efo: "EFO_0003963", mesh: "D005666" }, "白化病": { efo: "HP_0001022", mesh: "D000410" }, "太田痣": { efo: "EFO_1000396", mesh: "D009405" }, "咖啡斑": { efo: "HP_0000957", mesh: "D002143" }, "带状疱疹": { efo: "EFO_0006510", mesh: "D006539" }, "单纯疱疹": { efo: "EFO_1002022", mesh: "D006528" }, "足癣": { efo: "EFO_0007512", mesh: "D014034" }, "毛囊炎": { efo: "EFO_1000702", mesh: "D005418" }, "脓疱疮": { efo: "EFO_1000714", mesh: "D007107" }, "丹毒": { efo: "EFO_1001462", mesh: "D004903" }, "黑色素瘤": { efo: "EFO_0000756", mesh: "D008544" }, "基底细胞癌(BCC)": { efo: "EFO_0004193", mesh: "D001470" }, "鳞状细胞癌(SCC)": { efo: "EFO_0000707", mesh: "D013041" }, "脂溢性角化病": { efo: "EFO_0005584", mesh: "D012868" }, "血管瘤": { efo: "EFO_1000635", mesh: "D006439" }, "皮肤纤维肉瘤": { efo: "MONDO_0011934", mesh: "D018259" }, "蕈样肉芽肿": { efo: "EFO_1001051", mesh: "D009103" }, "系统性红斑狼疮": { efo: "HP_0002725", mesh: "D012148" }, "天疱疮": { efo: "EFO_1000749", mesh: "D010422" }, "类天疱疮": { efo: "EFO_0007187", mesh: "D010423" }, "皮肌炎": { efo: "EFO_0000398", mesh: "D003908" }, "硬皮病": { efo: "EFO_1001993", mesh: "D012559" }, "白塞病": { efo: "EFO_0003780", mesh: "D001565" }, "鱼鳞病": { efo: "MONDO_0019269", mesh: "D007115" }, "毛周角化症": { efo: "MONDO_0021036", mesh: "D007620" }, "大疱性表皮松解症(EB)": { efo: "EFO_1000690", mesh: "D004946" }, "掌跖角化病": { efo: "EFO_1000745", mesh: "D010624" }, "达里尔病": { efo: "EFO_1000703", mesh: "D005557" }, "荨麻疹": { efo: "EFO_0005531", mesh: "D014422" }, "血管性水肿": { efo: "EFO_0005532", mesh: "D000323" }, "日光性皮炎": { efo: "EFO_1000752", mesh: "D010627" }
 };
 
-// ========== 实体类型筛选 ==========
-const ENTITY_TYPES = [
-  { key: NodeType.Disease, label: '皮肤疾病', checked: true },
-  { key: NodeType.Gene, label: '关键基因', checked: true },
-  { key: NodeType.Drug, label: '皮科药物', checked: true },
-  { key: NodeType.Pathway, label: '皮肤通路', checked: true },
-  { key: NodeType.Protein, label: '表皮蛋白', checked: true },
-];
-
-// ========== 接口地址 ==========
 const OPENTARGETS_API_URL = 'http://127.0.0.1:3000/api/opentargets/graphql';
-const NCBI_API_KEY = '52c34128b128ec467b1a854bc0150a695b08';
-
-// ========== 全局缓存 ==========
-const diseaseGraphCache = new Map<string, { graph: KnowledgeGraphData; literature: any[] }>();
-const diseaseRequestLock = new Map<string, boolean>();
-
-// 疾病映射表（仅疾病编码映射，非业务逻辑映射）
-const DISEASE_MAP = {
-  "银屑病": { efo: "EFO_0000676", mesh: "D011506" },
-  "特应性皮炎": { efo: "EFO_0000276", mesh: "D003876" },
-  "斑秃": { efo: "EFO_0000289", mesh: "D001879" },
-  "痤疮": { efo: "EFO_0000239", mesh: "D001124" },
-  "湿疹": { efo: "EFO_0000274", mesh: "D004511" },
-  "白癜风": { efo: "EFO_0000730", mesh: "D014809" }
-};
 
 const KnowledgeGraph: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [graphData, setGraphData] = useState<KnowledgeGraphData>({ nodes: [], links: [] });
-  const [literature, setLiterature] = useState<Array<{
-    pmid: string;
-    title: string;
-    abstract: string;
-    pubDate: string;
-  }>>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
-  const [filteredTypes, setFilteredTypes] = useState<Record<NodeType, boolean>>(
-    ENTITY_TYPES.reduce((acc, item) => ({ ...acc, [item.key]: item.checked }), {} as Record<NodeType, boolean>)
-  );
-  
-  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const fgRef = useRef<any>(null);
+  const [filteredTypes, setFilteredTypes] = useState<Record<NodeType, boolean>>({
+    [NodeType.Disease]: true, [NodeType.Gene]: true, [NodeType.Drug]: true, 
+    [NodeType.Pathway]: true, [NodeType.Protein]: true, [NodeType.Literature]: true
+  });
 
-  // ========== 1. 获取 Open Targets 疾病相关靶点 ==========
-  const getOpenTargetsData = async (efoId: string) => {
-    try {
-      const query = `
-        query DiseaseTargets {
-          disease(efoId: "${efoId}") {
-            associatedTargets(page: {size: 10, index: 0}) {
-              rows {
-                target { id approvedSymbol approvedName }
-                score
-                datatypeScores { id score }
-              }
-            }
-          }
-        }
-      `;
-      const res = await axios.post(OPENTARGETS_API_URL, { query }, {
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 10000
-      });
-      return (res as any).data.data?.disease?.associatedTargets?.rows || [];
-    } catch (err) { 
-      console.error("Open Targets 靶点数据获取失败:", err);
-      setError("靶点数据加载失败，请检查后端服务是否启动");
-      return [];
-    }
-  };
-
-  // ========== 2. 获取 OpenTargets 靶点对应的药物数据 ==========
-  const getOpenTargetsDrugs = async (efoId: string) => {
-    try {
-      const query = `query { disease(efoId:"EFO_0000676"){associatedTargets{rows{target{id approvedSymbol knownDrugs{rows{drug{id name}}}}}}}}}`;
-      const res = await axios.post(
-        "http://127.0.0.1:3000/api/opentargets/graphql",
-        { query },
-        { headers: { "Content-Type": "application/json" }, timeout: 30000 }
-      );
-      const targetRows = (res as any).data.data?.disease?.associatedTargets?.rows || [];
-      const drugs: any[] = [];
-      targetRows.forEach((row: any, targetIndex: number) => {
-        if (row.target?.knownDrugs?.rows) {
-          row.target.knownDrugs.rows.forEach((drugRow: any, drugIndex: number) => {
-            drugs.push({
-              id: `drug-${row.target.id}-${drugIndex}`, 
-              name: drugRow.drug.name || "未知药物",
-              targetId: row.target.id,
-              isRepurposing: false,
-              formulation: "未知作用机制"
-            });
-          });
-        }
-      });
-      return drugs;
-    } catch (err) {
-      console.error("OpenTargets 药物数据获取失败:", err);
-      return [];
-    }
-  };
-
-  // ========== 3. 获取 NCBI PubMed 相关文献 ==========
-  const getNCBILiterature = async (meshId: string) => {
-    try {
-      const searchParams = new URLSearchParams({
-        db: 'pubmed',
-        term: `${meshId}[MeSH Terms] AND (gene OR target OR drug)`,
-        retmax: '5',
-        retmode: 'json',
-        api_key: NCBI_API_KEY
-      });
-      const searchRes = await axios.get(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi`, { 
-        params: searchParams, timeout: 30000 
-      });
-      const pmids = (searchRes as any).data?.esearchresult?.idlist || [];
-      if (pmids.length === 0) return [];
-
-      const summaryParams = new URLSearchParams({
-        db: 'pubmed',
-        id: pmids.join(','),
-        retmode: 'json',
-        api_key: NCBI_API_KEY
-      });
-      const summaryRes = await axios.get(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi`, { 
-        params: summaryParams, timeout: 30000 
-      });
-      const result = (summaryRes as any).data?.result || {};
-
-      return pmids.map((pmid: string) => ({
-        pmid,
-        title: result[pmid]?.title || '',
-        abstract: result[pmid]?.abstract || '',
-        pubDate: result[pmid]?.pubdate || ''
-      }));
-    } catch (err) {
-      console.error("NCBI 文献获取失败:", err);
-      setError("NCBI PubMed 接口调用失败（请检查网络/API Key/外网访问权限）");
-      return [];
-    }
-  };
-
-  // ========== 4. 主函数：整合所有数据 ==========
   const fetchData = async (query: string) => {
-    if (!query.trim()) {
-      setGraphData({ nodes: [], links: [] });
-      setLiterature([]);
-      return;
-    }
-
-    let matchedDisease: any = null;
+    if (!query.trim()) return;
+    let matched = null;
     for (const [name, config] of Object.entries(DISEASE_MAP)) {
-      if (query.includes(name)) {
-        matchedDisease = { name, ...config };
-        break;
-      }
+      if (query.includes(name)) { matched = { name, ...config }; break; }
     }
-
-    if (!matchedDisease) {
-      setError("未匹配到皮肤疾病，请输入：银屑病/特应性皮炎/斑秃/痤疮/湿疹/白癜风");
-      setLoading(false);
-      return;
-    }
-
-    const cacheKey = matchedDisease.name;
-    if (diseaseGraphCache.has(cacheKey)) {
-      const cachedData = diseaseGraphCache.get(cacheKey)!;
-      const filteredNodes = cachedData.graph.nodes.filter(node => filteredTypes[node.type]);
-      const filteredLinks = cachedData.graph.links.filter(link => 
-        filteredNodes.some(n => n.id === link.source) && 
-        filteredNodes.some(n => n.id === link.target)
-      );
-      
-      setGraphData({ nodes: filteredNodes, links: filteredLinks });
-      setLiterature(cachedData.literature);
-      setLoading(false);
-      return;
-    }
-
-    if (diseaseRequestLock.get(cacheKey)) {
-      setLoading(false);
-      return;
-    }
+    if (!matched) { setError("未匹配到疾病"); return; }
 
     setLoading(true);
     setError('');
-    setGraphData({ nodes: [], links: [] });
-    setLiterature([]);
 
     try {
-      diseaseRequestLock.set(cacheKey, true);
-      const [targets, literatureData] = await Promise.all([
-        getOpenTargetsData(matchedDisease.efo),
-        getNCBILiterature(matchedDisease.mesh)
-      ]);
-      const drugs = await getOpenTargetsDrugs(matchedDisease.efo);
-
-      // 构建节点
-      const diseaseNode: Node = {
-        id: matchedDisease.efo,
-        name: matchedDisease.name,
-        type: NodeType.Disease,
-        val: 1.0
-      };
-
-      const targetNodes: Node[] = targets.map((item: any) => ({
-        id: item.target.id,
-        name: item.target.approvedSymbol,
-        type: NodeType.Gene,
-        val: item.score
-      }));
-
-      const drugNodes: Node[] = drugs.map((drug: any) => ({
-        id: `drug-${drug.id}`,
-        name: drug.name || `药物-${drug.id.slice(-6)}`,
-        type: NodeType.Drug,
-        val: 0.7,
-        repurposing: drug.isRepurposing,
-        formulation: drug.formulation
-      }));
-
-      // 动态通路
-      const pathwayMap = new Map<string, string>();
-      targetNodes.forEach(node => {
-        const pathwayName = getPathwayByTarget(node.name);
-        if (pathwayName) pathwayMap.set(pathwayName, `pathway-${Array.from(pathwayMap.keys()).length}`);
+      const otRes = await axios.post(OPENTARGETS_API_URL, { 
+        query: `query { disease(efoId: "${matched.efo}") { associatedTargets(page: {size: 15, index: 0}) { rows { target { id approvedSymbol approvedName pathways { pathway } } score } } } }`
       });
-      const pathwayNodes: Node[] = Array.from(pathwayMap.entries()).map(([name, id]) => ({
-        id, name, type: NodeType.Pathway, val: 0.8
-      }));
+      const topTargets = otRes.data.data?.disease?.associatedTargets?.rows || [];
 
-      // 动态蛋白
-      const proteinMap = new Map<string, string>();
-      targetNodes.forEach(node => {
-        const proteinName = getProteinByTarget(node.name);
-        if (proteinName) proteinMap.set(proteinName, `protein-${Array.from(proteinMap.keys()).length}`);
-      });
-      const proteinNodes: Node[] = Array.from(proteinMap.entries()).map(([name, id]) => ({
-        id, name, type: NodeType.Protein, val: 0.8
-      }));
-
-      // 关联关系
-      const targetDiseaseLinks: Link[] = targetNodes.map(node => ({
-        source: node.id, target: diseaseNode.id, type: RelationType.ASSOCIATED_WITH
-      }));
-
-      const drugTargetLinks: Link[] = drugNodes.map((drugNode, index) => {
-        const targetNode = targetNodes.find(n => n.id === drugs[index]?.targetId) || targetNodes[index % targetNodes.length];
-        return { source: drugNode.id, target: targetNode.id, type: RelationType.TARGETS };
-      });
-
-      const pathwayTargetLinks: Link[] = [];
-      targetNodes.forEach(targetNode => {
-        const pathwayName = getPathwayByTarget(targetNode.name);
-        if (pathwayName && pathwayMap.has(pathwayName)) {
-          const pathwayId = pathwayMap.get(pathwayName)!;
-          pathwayTargetLinks.push({
-            source: targetNode.id, target: pathwayId, type: RelationType.REGULATES
-          });
-        }
-      });
-
-      const proteinTargetLinks: Link[] = [];
-      targetNodes.forEach(targetNode => {
-        const proteinName = getProteinByTarget(targetNode.name);
-        if (proteinName && proteinMap.has(proteinName)) {
-          const proteinId = proteinMap.get(proteinName)!;
-          proteinTargetLinks.push({
-            source: targetNode.id, target: proteinId, type: RelationType.INTERACTS_WITH
-          });
-        }
-      });
-
-      // 整合
-      const allNodes = [diseaseNode, ...targetNodes, ...drugNodes, ...pathwayNodes, ...proteinNodes];
-      const allLinks = [...targetDiseaseLinks, ...drugTargetLinks, ...pathwayTargetLinks, ...proteinTargetLinks];
-      const filteredNodes = allNodes.filter(node => filteredTypes[node.type]);
-      const filteredLinks = allLinks.filter(link => 
-        filteredNodes.some(n => n.id === link.source) && filteredNodes.some(n => n.id === link.target)
+      const drugPromises = topTargets.map((t: any) => 
+        axios.get(`https://www.ebi.ac.uk/chembl/api/data/drug?target_components__target_component_synonyms__component_synonym__icontains=${t.target.approvedSymbol}&format=json`)
+      );
+      const litPromises = topTargets.map((t: any) => 
+        axios.post(OPENTARGETS_API_URL, { 
+          query: `query { disease(efoId: "${matched!.efo}") { evidences(datasourceIds: ["europepmc"], ensemblIds: ["${t.target.id}"], size: 3) { rows { literature textMiningSentences { text } } } } }` 
+        })
       );
 
-      diseaseGraphCache.set(cacheKey, { graph: { nodes: allNodes, links: allLinks }, literature: literatureData });
-      setGraphData({ nodes: filteredNodes, links: filteredLinks });
-      setLiterature(literatureData);
+      const [drugRes, litRes] = await Promise.all([Promise.all(drugPromises), Promise.all(litPromises)]);
+
+      const nodes: Node[] = [];
+      const links: Link[] = [];
+      const nodeSet = new Set();
+
+      const diseaseNode: Node = { id: matched.efo, name: matched.name, type: NodeType.Disease, val: 30 };
+      nodes.push(diseaseNode); nodeSet.add(matched.efo);
+
+      topTargets.forEach((t: any, idx: number) => {
+        const targetId = t.target.id;
+        const symbol = t.target.approvedSymbol;
+        const fullProteinName = t.target.approvedName; 
+        const apiPathways = t.target.pathways || []; 
+        
+        if (!nodeSet.has(targetId)) {
+            nodes.push({ id: targetId, name: symbol, type: NodeType.Gene, val: 20 });
+            nodeSet.add(targetId);
+        }
+        links.push({ source: diseaseNode.id, target: targetId, type: RelationType.ASSOCIATED_WITH });
+
+        // ================= 修复 1：深度挖掘真实的药物名称 =================
+        const drugs = drugRes[idx].data?.drugs || [];
+        drugs.slice(0, 3).forEach((d: any) => {
+          const dId = `drug-${d.molecule_chembl_id}`;
+          if (!nodeSet.has(dId)) {
+            let finalDrugName = d.pref_name;
+            
+            // 如果首选名为空，深层遍历提取真正的学术名或商品名
+            if (!finalDrugName && d.molecule_synonyms && d.molecule_synonyms.length > 0) {
+                // 优先找 INN (国际非专利名称) 或 TRADE_NAME
+                const goodSynonym = d.molecule_synonyms.find((s: any) => s.syn_type === 'INN' || s.syn_type === 'TRADE_NAME');
+                finalDrugName = goodSynonym ? goodSynonym.molecule_synonym : d.molecule_synonyms[0].molecule_synonym;
+            }
+            
+            // 只有当同义词都没有时，才使用 CHEMBL ID，并全部转大写
+            finalDrugName = finalDrugName ? finalDrugName.toUpperCase() : d.molecule_chembl_id;
+
+            nodes.push({ id: dId, name: finalDrugName, type: NodeType.Drug, val: 15, formulation: d.atc_classification?.[0]?.description });
+            nodeSet.add(dId);
+          }
+          links.push({ source: dId, target: targetId, type: RelationType.TARGETS });
+        });
+
+        const lits = litRes[idx].data.data?.disease?.evidences?.rows || [];
+        lits.forEach((lit: any) => {
+            const pmid = lit.literature?.[0];
+            if (pmid && !nodeSet.has(`lit-${pmid}`)) {
+                nodes.push({ id: `lit-${pmid}`, name: `PMID:${pmid}`, type: NodeType.Literature, val: 8, pmid });
+                nodeSet.add(`lit-${pmid}`);
+                links.push({ source: `lit-${pmid}`, target: targetId, type: RelationType.SUPPORTED_BY });
+            }
+        });
+
+        // ================= 修复 2：彻底移除截断，展示通路全称 =================
+        if (apiPathways.length > 0) {
+            const pName = apiPathways[0].pathway; // 完全不截断
+            const pId = `p-${pName.replace(/\s+/g, '-')}`;
+            if (!nodeSet.has(pId)) { 
+                nodes.push({ id: pId, name: pName, type: NodeType.Pathway, val: 15 }); 
+                nodeSet.add(pId); 
+            }
+            links.push({ source: targetId, target: pId, type: RelationType.REGULATES });
+        } else {
+            const pway = getPathwayByTarget(symbol);
+            if (pway) {
+              const pId = `p-${pway}`;
+              if (!nodeSet.has(pId)) { nodes.push({ id: pId, name: pway, type: NodeType.Pathway, val: 15 }); nodeSet.add(pId); }
+              links.push({ source: targetId, target: pId, type: RelationType.REGULATES });
+            }
+        }
+        
+        // ================= 修复 2：彻底移除截断，展示蛋白全称 =================
+        if (fullProteinName) {
+            const prId = `pr-${targetId}`;
+            if (!nodeSet.has(prId)) { 
+                nodes.push({ id: prId, name: fullProteinName, type: NodeType.Protein, val: 12 }); // 完全不截断
+                nodeSet.add(prId); 
+            }
+            links.push({ source: targetId, target: prId, type: RelationType.INTERACTS_WITH });
+        } else {
+            const protein = getProteinByTarget(symbol);
+            if (protein) {
+              const prId = `pr-${protein}`;
+              if (!nodeSet.has(prId)) { nodes.push({ id: prId, name: protein, type: NodeType.Protein, val: 12 }); nodeSet.add(prId); }
+              links.push({ source: targetId, target: prId, type: RelationType.INTERACTS_WITH });
+            }
+        }
+      });
+
+      setGraphData({ nodes, links });
+    } catch (err) { setError("数据链路异常，请确认后端运行"); } finally { setLoading(false); }
+  };
+
+  // ================= 修复 3：高清无损的带背景下载引擎 =================
+  const handleExport = () => {
+    if (graphData.nodes.length === 0) {
+      setError("当前没有可导出的图谱，请先搜索疾病。");
+      return;
+    }
+    try {
+      const originalCanvas = containerRef.current?.querySelector('canvas');
+      if (originalCanvas) {
+        // 创建一个全新的虚拟画布
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = originalCanvas.width;
+        tempCanvas.height = originalCanvas.height;
+        const ctx = tempCanvas.getContext('2d');
+        
+        if (ctx) {
+          // 第一步：用深空蓝背景填满画布 (解决背景透明导致的黑字看不清问题)
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+          
+          // 第二步：将原有的图谱层叠画上去
+          ctx.drawImage(originalCanvas, 0, 0);
+          
+          // 第三步：导出高精度 PNG
+          const url = tempCanvas.toDataURL('image/png'); 
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${searchQuery || '皮科'}_AI知识图谱.png`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+      } else {
+        setError("无法获取图谱画布，请确保图谱已完全加载。");
+      }
     } catch (err) {
-      console.error("数据整合失败:", err);
-      setError("数据加载失败，请稍后重试");
-    } finally {
-      diseaseRequestLock.set(cacheKey, false);
-      setLoading(false);
+      setError("导出失败，请检查浏览器权限。");
     }
   };
 
-  // ========== 防抖搜索 ==========
-  useEffect(() => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    if (searchQuery.trim()) {
-      debounceTimer.current = setTimeout(() => fetchData(searchQuery), 500);
-    } else {
-      setGraphData({ nodes: [], links: [] });
-      setLiterature([]);
-      setError('');
-    }
-    return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); };
-  }, [searchQuery, filteredTypes]);
-
-  // ========== 事件处理 ==========
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    fetchData(searchQuery);
-  };
-
-  const toggleFilter = (key: NodeType) => {
-    setFilteredTypes(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const exportData = () => {
-    if (!graphData.nodes.length) return;
-    const exportObj = { searchQuery, graph: graphData, literature, exportTime: new Date().toISOString() };
-    const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `skin-graph-${searchQuery || 'default'}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  // ========== 页面渲染 ==========
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-20 p-4">
-      <div className="flex flex-col gap-4">
+    <div className="max-w-7xl mx-auto space-y-6 pb-10 p-4 bg-slate-50 min-h-screen font-sans">
+      <div className="flex flex-col gap-2 border-b pb-6">
         <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-3">
-          <Info className="w-8 h-8 text-indigo-600" />
-          皮肤生物学知识图谱
+          <Layers className="text-indigo-600 w-8 h-8" /> AI 知识图谱
         </h1>
-        <p className="text-slate-500 font-medium">
-          基于 Open Targets 权威靶点数据 + NCBI PubMed 文献库，动态生成疾病-靶点-药物关联网络
-        </p>
+        <p className="text-slate-500 font-medium italic">集成 Open Targets, ChEMBL 与 PubMed 实时全维度证据</p>
       </div>
 
-      {error && (
-        <div className="bg-red-50 p-4 rounded-xl border border-red-100 text-red-700 text-sm">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4" />
-            {error}
-          </div>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-2 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <form onSubmit={handleSearch} className="flex items-center gap-2">
-            <Search className="w-5 h-5 text-slate-400 ml-2" />
-            <input
-              type="text"
-              placeholder="搜索皮肤疾病（银屑病/特应性皮炎/斑秃/痤疮等）"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 px-4 py-2 text-sm border-none focus:outline-none"
-            />
-            <button 
-              type="submit"
-              disabled={loading || !searchQuery.trim()}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:bg-slate-300 transition-colors"
-            >
-              {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : '搜索'}
-            </button>
-          </form>
+        <div className="lg:col-span-2 bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-2">
+            <Search className="w-5 h-5 text-slate-400" />
+            <input type="text" placeholder="搜索 47 种疾病..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && fetchData(searchQuery)} className="flex-1 border-none focus:outline-none font-medium" />
+            <button onClick={() => fetchData(searchQuery)} className="px-6 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700">搜索</button>
         </div>
-
-        <div className="lg:col-span-1 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <Filter className="w-4 h-4 text-slate-500" />
-            <h3 className="text-sm font-bold text-slate-800">实体类型筛选</h3>
-          </div>
-          <div className="space-y-2">
-            {ENTITY_TYPES.map(item => (
-              <div key={item.key} className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id={`filter-${item.key}`}
-                  checked={filteredTypes[item.key]}
-                  onChange={() => toggleFilter(item.key)}
-                  className="rounded text-indigo-600"
-                  disabled={loading}
-                />
-                <label htmlFor={`filter-${item.key}`} className="text-xs font-medium text-slate-700">
-                  {item.label}
-                </label>
-              </div>
-            ))}
-          </div>
+        <div className="lg:col-span-1 bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
+            <div className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">层级筛选已激活</div>
+            <div className="flex flex-wrap gap-2">
+                {Object.entries(filteredTypes).map(([type, checked]) => (
+                    <div key={type} className="flex items-center gap-1">
+                        <input type="checkbox" checked={checked} onChange={() => setFilteredTypes(p => ({...p, [type]: !p[type as NodeType]}))} className="w-3 h-3" />
+                        <span className="text-[10px] font-bold text-slate-600">
+                          {type === 'disease' ? '疾病' : type === 'gene' ? '基因' : type === 'drug' ? '药物' : type === 'pathway' ? '通路' : type === 'protein' ? '蛋白' : '文献'}
+                        </span>
+                    </div>
+                ))}
+            </div>
         </div>
-
-        <div className="lg:col-span-1 bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-center">
-          <button
-            onClick={exportData}
-            disabled={!graphData.nodes.length || loading}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 disabled:bg-slate-300 transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            导出数据
+        <div className="lg:col-span-1 flex items-center justify-center">
+          <button onClick={handleExport} className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold shadow-md hover:bg-emerald-700 transition-colors">
+            <Download className="w-4 h-4" /> 导出数据
           </button>
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm min-h-[600px] w-full">
-        <GraphView data={graphData} loading={loading} />
-      </div>
+      {error && <div className="bg-red-50 p-4 rounded-xl border border-red-100 text-red-700 text-sm flex items-center gap-2 shadow-sm"><AlertCircle className="w-5 h-5" /> {error}</div>}
 
-      {literature.length > 0 && (
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-blue-600" />
-            相关文献（NCBI PubMed）
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {literature.map(doc => (
-              <div key={doc.pmid} className="border border-slate-100 rounded-lg p-4 hover:shadow-md transition-all">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-bold text-blue-600">PMID: {doc.pmid}</span>
-                  <span className="text-xs text-slate-500">{doc.pubDate}</span>
-                </div>
-                <h4 className="text-sm font-bold text-slate-800 mb-2">{doc.title}</h4>
-                <p className="text-xs text-slate-600 line-clamp-3">{doc.abstract}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <div className="bg-[#0f172a] rounded-2xl shadow-2xl border border-slate-800 relative overflow-hidden" style={{ height: '1000px' }}>
+        {loading ? (
+            <div className="flex flex-col items-center justify-center h-full text-slate-400"><RefreshCw className="animate-spin w-12 h-12 mb-4 text-indigo-500" /><p className="font-bold">深度挖掘全量关联数据中...</p></div>
+        ) : graphData.nodes.length > 0 ? (
+            <ForceGraph2D
+                ref={fgRef}
+                graphData={{ nodes: graphData.nodes.filter(n => filteredTypes[n.type]), links: graphData.links }}
+                width={containerRef.current?.clientWidth || 1100}
+                height={1000}
+                nodeRelSize={7}
+                linkColor={() => 'rgba(200, 200, 200, 0.2)'} 
+                linkDirectionalParticles={4}
+                linkDirectionalParticleSpeed={0.005}
+                d3VelocityDecay={0.3} 
+                onNodeClick={(node: any) => {
+                    if (node.type === NodeType.Literature && node.pmid) {
+                        window.open(`https://pubmed.ncbi.nlm.nih.gov/${node.pmid}/`, '_blank');
+                    }
+                }}
+                nodeCanvasObject={(node: any, ctx, globalScale) => {
+                    const label = node.name;
+                    const fontSize = 12/globalScale; // 字体稍微调小一点，确保全称不突兀
+                    ctx.font = `${fontSize}px Inter, sans-serif`;
+                    const colors: any = { disease: '#ef4444', gene: '#3b82f6', drug: '#10b981', pathway: '#f59e0b', protein: '#ec4899', literature: '#8b5cf6' };
+                    
+                    ctx.beginPath(); ctx.arc(node.x, node.y, 6, 0, 2 * Math.PI, false);
+                    ctx.fillStyle = colors[node.type] || '#fff'; ctx.fill();
 
-      <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-        <div className="flex items-center gap-2 mb-2">
-          <Info className="w-4 h-4 text-blue-600" />
-          <h3 className="text-sm font-bold text-blue-800">使用提示</h3>
+                    // 文字描边
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 3/globalScale; ctx.strokeText(label, node.x, node.y + 12);
+                    ctx.fillStyle = '#f8fafc'; ctx.fillText(label, node.x, node.y + 12);
+                }}
+            />
+        ) : (
+            <div className="flex flex-col items-center justify-center h-full text-slate-600">
+                <Info className="w-16 h-16 opacity-20 mb-4" />
+                <p className="text-lg">请输入疾病并构建图谱以展示关联</p>
+            </div>
+        )}
+        
+        <div className="absolute top-6 right-6 bg-slate-100/90 backdrop-blur-md p-4 rounded-xl shadow-2xl border border-slate-200 z-10 w-36 pointer-events-none">
+            <p className="font-extrabold text-slate-800 mb-3 text-xs border-b border-slate-300 pb-1 text-center">图谱实例</p>
+            <div className="space-y-2.5">
+                <div className="flex items-center gap-3"><div className="w-3.5 h-3.5 rounded-full bg-[#ef4444]"></div><span className="text-[11px] font-bold text-slate-700">皮肤疾病</span></div>
+                <div className="flex items-center gap-3"><div className="w-3.5 h-3.5 rounded-full bg-[#3b82f6]"></div><span className="text-[11px] font-bold text-slate-700">关键基因</span></div>
+                <div className="flex items-center gap-3"><div className="w-3.5 h-3.5 rounded-full bg-[#10b981]"></div><span className="text-[11px] font-bold text-slate-700">皮科药物</span></div>
+                <div className="flex items-center gap-3"><div className="w-3.5 h-3.5 rounded-full bg-[#f59e0b]"></div><span className="text-[11px] font-bold text-slate-700">皮肤通路</span></div>
+                <div className="flex items-center gap-3"><div className="w-3.5 h-3.5 rounded-full bg-[#ec4899]"></div><span className="text-[11px] font-bold text-slate-700">表皮蛋白</span></div>
+                <div className="flex items-center gap-3"><div className="w-3.5 h-3.5 rounded-full bg-[#8b5cf6]"></div><span className="text-[11px] font-bold text-slate-700">科学文献</span></div>
+            </div>
         </div>
-        <ul className="text-xs text-blue-700 space-y-1 list-disc list-inside">
-          <li>支持搜索的疾病：银屑病、特应性皮炎、斑秃、痤疮、湿疹、白癜风</li>
-          <li>图谱节点大小代表 OpenTargets 关联分数，分数越高节点越大</li>
-          <li>药物节点标注「老药新用」标签，展示具体作用机制</li>
-          <li>可通过「实体类型筛选」隐藏/显示不同类型的实体（如仅查看关键基因）</li>
-          <li>点击「导出数据」可下载当前图谱和文献的 JSON 格式数据</li>
-          <li>文献数据来自 NCBI PubMed，仅展示与疾病-靶点相关的研究论文</li>
-          <li>首次加载可能较慢，请耐心等待；重复搜索同一疾病会复用缓存，速度更快</li>
-        </ul>
       </div>
     </div>
   );
