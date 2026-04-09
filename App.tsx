@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Search, Share2, Info, Activity, Beaker, Image as ImageIcon, Milestone } from 'lucide-react';
@@ -34,9 +35,6 @@ const Header = () => (
       <div className="flex items-center gap-2 px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm font-medium border border-green-100">
         <Activity className="w-4 h-4" />
         系统运行正常
-      </div>
-      <div className="w-8 h-8 rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center text-slate-600 font-bold text-xs cursor-pointer hover:bg-slate-300 transition-colors">
-        研究员
       </div>
     </div>
   </header>
