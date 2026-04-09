@@ -12,6 +12,10 @@
         body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
     </style>
 
+    <script>
+      window.process = { env: { NODE_ENV: 'production' } };
+    </script>
+
     <script type="importmap">
     {
       "imports": {
@@ -30,6 +34,6 @@
 </head>
 <body>
     <div id="root"></div>
-    <script type="text/babel" src="./index.tsx"></script>
+    <script type="text/babel" src="./index.tsx" data-type="module"></script>
 </body>
 </html>
