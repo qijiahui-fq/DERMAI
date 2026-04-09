@@ -2,7 +2,7 @@
 // @ts-nocheck
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App.tsx'; 
+import App from './App.jsx'; 
 
 const mountApp = () => {
     const rootElement = document.getElementById('root');
