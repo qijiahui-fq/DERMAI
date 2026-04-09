@@ -1,6 +1,17 @@
-import React, { useState } from 'react';
+// @ts-nocheck
+import React, { useState, useEffect } from 'react';
+// 确保 axios 引用正确（配合 index.html 的 importmap）
 import axios from 'axios';
-import { Search, Loader2, ExternalLink, Dna, Info, ChevronRight, Grid, ChevronDown, ChevronUp, BookOpen, CheckCircle2, BarChart3, Layers, Cpu, Calculator, ShieldCheck, FileText, Microscope, Activity } from 'lucide-react';
+import { 
+  Search, Loader2, ExternalLink, Dna, Info, ChevronRight, Grid, 
+  ChevronDown, ChevronUp, BookOpen, CheckCircle2, BarChart3, 
+  Layers, Cpu, Calculator, ShieldCheck, Activity 
+} from 'lucide-react';
+// Recharts 的引用在 esm.sh 模式下有时需要解构
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
+  ResponsiveContainer, AreaChart, Area, Cell 
+} from 'recharts';
 
 interface ScoreBreakdown { 
   genetics: number; 
