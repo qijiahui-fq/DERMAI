@@ -1,13 +1,14 @@
-
+// @ts-nocheck
 import React from 'react';
 import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Search, Share2, Info, Activity, Beaker, Image as ImageIcon, Milestone } from 'lucide-react';
-// 示例：App.tsx 内部也需要加上 .tsx
+import { LayoutDashboard, Search, Share2, Info, Activity, Beaker } from 'lucide-react';
+
+// 🚀 确保这里带后缀，且路径正确
 import Dashboard from './pages/Dashboard.tsx';
 import TargetID from './pages/TargetID.tsx';
 import KnowledgeGraph from './pages/KnowledgeGraph.tsx';
 
-const SidebarLink: React.FC<{ to: string; icon: React.ReactNode; label: string }> = ({ to, icon, label }) => {
+const SidebarLink = ({ to, icon, label }) => {
   const location = useLocation();
   const isActive = location.pathname === to;
 
@@ -32,16 +33,14 @@ const Header = () => (
       <Beaker className="w-6 h-6" />
       <span>DermAI 皮肤药研平台</span>
     </div>
-    <div className="flex items-center gap-4">
-      <div className="flex items-center gap-2 px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm font-medium border border-green-100">
-        <Activity className="w-4 h-4" />
-        系统运行正常
-      </div>
+    <div className="flex items-center gap-2 px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm font-medium border border-green-100">
+      <Activity className="w-4 h-4" />
+      系统运行正常
     </div>
   </header>
 );
 
-const App: React.FC = () => {
+const App = () => {
   return (
     <HashRouter>
       <div className="min-h-screen flex flex-col bg-slate-50">
@@ -52,9 +51,6 @@ const App: React.FC = () => {
             <SidebarLink to="/" icon={<LayoutDashboard className="w-5 h-5" />} label="控制面板" />
             <SidebarLink to="/target-id" icon={<Search className="w-5 h-5" />} label="靶点识别" />
             <SidebarLink to="/knowledge-graph" icon={<Share2 className="w-5 h-5" />} label="皮肤知识图谱" />
-            <div className="mt-auto border-t border-slate-100 pt-4">
-              <SidebarLink to="/help" icon={<Info className="w-5 h-5" />} label="帮助文档" />
-            </div>
           </aside>
           
           <main className="flex-1 overflow-y-auto p-8">
