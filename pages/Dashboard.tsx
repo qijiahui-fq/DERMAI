@@ -1,3 +1,4 @@
+/** @jsx React.createElement */
 // @ts-nocheck
 import React from 'react';
 // 🚀 核心修改：在免编译模式下，Link 必须从 react-router-dom 导入
