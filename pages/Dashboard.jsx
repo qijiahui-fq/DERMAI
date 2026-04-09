@@ -1,18 +1,18 @@
 /** @jsx React.createElement */
-// @ts-nocheck
-import React from 'react';
-// 🚀 核心修改：在免编译模式下，Link 必须从 react-router-dom 导入
-import { Link } from 'react-router-dom';
-import { 
+// 🚀 DermAI 仪表盘：全量保留图表、统计与导航逻辑
+
+// 1. 对接全局变量 (代替所有 import)
+const { Link } = ReactRouterDOM;
+const { 
   Search, Share2, ArrowRight, Activity, Database, 
   Dna, CheckCircle2, Info, Layers 
-} from 'lucide-react';
-import { 
+} = LucideIcons;
+const { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer, AreaChart, Area, Cell 
-} from 'recharts';
+} = Recharts;
 
-// 模拟数据保持不变
+// 📊 模拟数据 
 const data = [
   { name: '炎症性', count: 1120, color: '#3b82f6' },
   { name: '肿瘤性', count: 890, color: '#ec4899' },
@@ -22,6 +22,7 @@ const data = [
   { name: '免疫/遗传', count: 420, color: '#f97316' },
 ];
 
+// 🚀 子组件：统计卡片
 const StatCard = ({ title, value, icon, color, description }) => (
   <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex items-start justify-between hover:border-slate-300 transition-all group relative overflow-hidden">
     <div className="relative z-10">
@@ -38,6 +39,7 @@ const StatCard = ({ title, value, icon, color, description }) => (
   </div>
 );
 
+// 🚀 主页面组件
 const Dashboard = () => {
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-20 p-4">
