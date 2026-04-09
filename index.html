@@ -40,44 +40,58 @@
         window.LucideIcons = LucideIcons;
         window.d3 = d3;
 
-        const PageLoader = ({ name }) => {
+      const PageLoader = ({ name }) => {
             const [Comp, setComp] = useState(null);
             const [error, setError] = useState(null);
 
             useEffect(() => {
-                // 加上随机参数强制刷掉 pages 文件夹里的缓存
+                setComp(null); // 切换页面时重置
                 fetch(`./pages/${name}.jsx?update=${Date.now()}`)
                     .then(res => {
                         if (!res.ok) throw new Error(`找不到文件: pages/${name}.jsx`);
                         return res.text();
                     })
                     .then(code => {
-                        // 抹除业务文件顶部的 import，由 PageLoader 统一注入
-                        const cleanCode = code.replace(/import\s+[\s\S]*?from\s+['"].*?['"];?/g, '// import removed');
+                        // 1. 彻底抹除所有可能干扰的 import 语句
+                        const cleanCode = code.replace(/import\s+[\s\S]*?from\s+['"].*?['"];?/g, '');
                         
+                        // 2. 转换为浏览器可执行的 JS
                         const result = Babel.transform(cleanCode, { 
                             presets: ['react', 'typescript'] 
                         }).code;
 
+                        // 3. 准备沙箱环境
                         const exports = {};
                         const module = { exports };
                         
-                        // 🚀 注入所有环境，确保 D3 和图标在 .jsx 里直接可用
+                        // 🚀 关键：显式定义 fn 的参数，并将 React 钩子直接注入
+                        // 注意这里的顺序必须和下面调用 fn 时的顺序完全一致
                         const fn = new Function(
-                            'React', 'useState', 'useEffect', 'useRef', 'exports', 'module', 
+                            'React', 'useState', 'useEffect', 'useRef', 
                             'LucideIcons', 'Recharts', 'axios', 'Link', 'd3',
+                            'exports', 'module', 
                             result
                         );
                         
+                        // 🚀 核心修复：直接使用 window.React 及其 Hook，确保全局唯一实例
                         fn(
-                            React, useState, useEffect, useRef, exports, module, 
-                            LucideIcons, Recharts, axios, Link, d3
+                            window.React, 
+                            window.React.useState, 
+                            window.React.useEffect, 
+                            window.React.useRef,
+                            window.LucideIcons, 
+                            window.Recharts, 
+                            window.axios, 
+                            Link, 
+                            window.d3,
+                            exports, 
+                            module
                         );
 
                         setComp(() => module.exports.default || module.exports);
                     })
                     .catch(err => {
-                        console.error("加载失败:", err);
+                        console.error("DermAI 加载失败:", err);
                         setError(err.message);
                     });
             }, [name]);
