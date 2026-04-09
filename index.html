@@ -21,8 +21,8 @@
     }
     </script>
 </head>
-<body class="bg-slate-50 text-slate-900">
-    <div id="root"></div>
+<body class="bg-slate-50">
+    <div id="dermai-app-container"></div>
 
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect } from 'react';
@@ -32,64 +32,49 @@
         import * as Recharts from 'recharts';
         import axios from 'axios';
 
-        // 统一注入环境，防止业务组件内部重复 import 导致 Hook 报错
+        // 🚀 核心修改 2：强行清理可能存在的旧 React 全局变量
         window.React = React;
-        window.LucideIcons = LucideIcons;
-
+        
         const PageLoader = ({ name }) => {
             const [Comp, setComp] = useState(null);
             const [error, setError] = useState(null);
 
             useEffect(() => {
-                // 🚀 路径已修正：现在指向根目录下的 pages/ 文件夹
-                fetch(`./pages/${name}.jsx`)
+                // 🚀 核心修改 3：加上随机参数防止缓存
+                fetch(`./pages/${name}.jsx?t=${Date.now()}`)
                     .then(res => {
-                        if (!res.ok) throw new Error(`找不到页面文件: pages/${name}.jsx`);
+                        if (!res.ok) throw new Error(`无法载入: pages/${name}.jsx`);
                         return res.text();
                     })
                     .then(code => {
-                        // 抹除业务代码中的所有 import 语句，改用我们注入的全局变量
                         const cleanCode = code.replace(/import\s+[\s\S]*?from\s+['"].*?['"];?/g, '// import removed');
-                        
-                        const result = Babel.transform(cleanCode, { 
-                            presets: ['react', 'typescript'] 
-                        }).code;
-
+                        const result = Babel.transform(cleanCode, { presets: ['react', 'typescript'] }).code;
                         const exports = {};
                         const module = { exports };
                         
-                        // 注入全局环境，确保业务代码里的组件和 Hook 能正常工作
                         const fn = new Function(
                             'React', 'useState', 'useEffect', 'exports', 'module', 
                             'LucideIcons', 'Recharts', 'axios', 'Link',
                             result
                         );
                         
-                        fn(
-                            React, useState, useEffect, exports, module, 
-                            LucideIcons, Recharts, axios, Link
-                        );
-
+                        fn(React, useState, useEffect, exports, module, LucideIcons, Recharts, axios, Link);
                         setComp(() => module.exports.default || module.exports);
                     })
                     .catch(err => {
-                        console.error("DermAI Loader Error:", err);
+                        console.error(err);
                         setError(err.message);
                     });
             }, [name]);
 
-            if (error) return (
-                <div className="p-20 text-red-500 text-center font-mono">
-                    <h2 className="text-xl font-bold mb-2">加载失败</h2>
-                    <p>{error}</p>
-                    <p className="text-sm text-slate-400 mt-4">请确认文件是否存在于 pages 目录下且后缀为 .jsx</p>
-                </div>
-            );
+            if (error) return <div className="p-20 text-red-500 text-center font-bold">系统同步异常: {error}</div>;
 
             return Comp ? <Comp /> : (
-                <div className="flex flex-col h-[60vh] items-center justify-center">
-                    <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                    <p className="mt-4 text-indigo-600 font-bold animate-pulse tracking-widest uppercase text-xs">DERMAI 模型同步中</p>
+                <div className="flex h-[80vh] items-center justify-center">
+                    <div className="text-center">
+                        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                        <p className="text-indigo-600 font-black animate-pulse uppercase tracking-widest text-xs">DERMAI 加载业务逻辑中...</p>
+                    </div>
                 </div>
             );
         };
@@ -97,12 +82,12 @@
         const App = () => (
             <HashRouter>
                 <div className="min-h-screen flex flex-col">
-                    <nav className="bg-white border-b px-6 py-4 flex justify-between items-center shadow-sm sticky top-0 z-50">
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-100">D</div>
-                            <span className="text-xl font-black text-slate-800 tracking-tight">DermAI</span>
+                    <nav className="bg-white border-b px-8 py-5 flex justify-between items-center shadow-sm sticky top-0 z-50">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black shadow-lg">D</div>
+                            <span className="text-2xl font-black text-slate-800 tracking-tighter">DermAI</span>
                         </div>
-                        <div className="flex gap-8 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+                        <div className="flex gap-10 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
                             <Link to="/" className="hover:text-indigo-600 transition-colors">药研中心</Link>
                             <Link to="/target-id" className="hover:text-indigo-600 transition-colors">靶点识别</Link>
                         </div>
@@ -111,20 +96,16 @@
                         <Routes>
                             <Route path="/" element={<PageLoader name="Dashboard" />} />
                             <Route path="/target-id" element={<PageLoader name="TargetID" />} />
-                            <Route path="*" element={<PageLoader name="Dashboard" />} />
                         </Routes>
                     </main>
-                    <footer className="p-8 text-center border-t border-slate-100">
-                        <p className="text-slate-300 text-[9px] font-bold tracking-[0.3em] uppercase">
-                            © 2026 DermAI · 数据赋能部门 · Data Empowerment Dept.
-                        </p>
+                    <footer className="py-8 text-center text-slate-300 text-[10px] font-bold tracking-[0.3em]">
+                        © 2026 DATA EMPOWERMENT DEPT.
                     </footer>
                 </div>
             </HashRouter>
         );
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+        // 🚀 对应修改 1 的挂载点
+        const rootElement = document.getElementById('dermai-app-container');
+        if (rootElement) {
+            ReactDOM.createRoot(root
