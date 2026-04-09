@@ -23,46 +23,59 @@
 <body>
     <div id="root"></div>
 
-    <script type="text/babel" data-presets="react,typescript">
-        import React from 'react';
-        import ReactDOM from 'react-dom/client';
-        import { HashRouter, Routes, Route, Link } from 'react-router-dom';
-        import { Beaker } from 'lucide-react';
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { HashRouter, Routes, Route, Link } = ReactRouterDom;
 
-        // 🚀 核心逻辑：既然浏览器不认文件，我们用动态 fetch 强行抓取你的业务页面
-        // 这样 Babel 会绕过控制台的 MIME 检查，直接处理文本
-        const RemoteComponent = ({ path }) => {
-            const [Comp, setComp] = React.useState(null);
-            React.useEffect(() => {
-                fetch(`./pages/${path}.jsx`)
-                    .then(res => res.text())
+        // 🚀 核心适配：直接指向你的 pages/pages/ 路径
+        const PageLoader = ({ name }) => {
+            const [Comp, setComp] = useState(null);
+            const [loadError, setLoadError] = useState(null);
+
+            useEffect(() => {
+                // 这里的路径必须和你 GitHub 上的嵌套结构完全一致
+                const targetPath = `./pages/pages/${name}.jsx`;
+                
+                fetch(targetPath)
+                    .then(res => {
+                        if (!res.ok) throw new Error(`无法加载文件: ${targetPath}`);
+                        return res.text();
+                    })
                     .then(code => {
-                        // 使用 Babel 手动翻译抓取到的代码
-                        const transformed = Babel.transform(code, { presets: ['react', 'typescript'] }).code;
+                        // 使用 Babel 现场编译抓取的 JSX 代码
+                        const result = Babel.transform(code, { 
+                            presets: ['react', 'typescript'] 
+                        }).code;
+                        
                         const exports = {};
                         const module = { exports };
-                        // 暴力执行，注入环境
-                        new Function('React', 'exports', 'module', transformed)(React, exports, module);
+                        // 注入全局变量，确保你的 TargetID 逻辑能跑通
+                        const fn = new Function('React', 'exports', 'module', 'lucideReact', 'recharts', 'axios', result);
+                        fn(React, exports, module, lucideReact, recharts, axios);
+                        
                         setComp(() => module.exports.default || module.exports);
                     })
-                    .catch(err => console.error("Loading Error:", err));
-            }, [path]);
+                    .catch(err => {
+                        console.error(err);
+                        setLoadError(err.message);
+                    });
+            }, [name]);
 
-            return Comp ? <Comp /> : <div className="p-20 text-center animate-pulse text-indigo-500 font-bold">DermAI 正在调取数据模型...</div>;
+            if (loadError) return <div className="p-20 text-red-500 text-center font-bold">路径匹配失败: {loadError}</div>;
+            return Comp ? <Comp /> : <div className="p-20 text-center text-indigo-500 font-bold animate-pulse">DermAI 正在同步皮科药研模型...</div>;
         };
 
         const Navbar = () => (
             <nav className="bg-white border-b border-slate-200 sticky top-0 z-50 px-6 flex justify-between h-16 items-center shadow-sm">
                 <Link to="/" className="flex items-center gap-2 group">
-                    <div className="p-2 bg-indigo-600 rounded-lg text-white group-hover:rotate-12 transition-transform shadow-md">
-                        <Beaker size={20} />
+                    <div className="p-2 bg-indigo-600 rounded-lg text-white shadow-md">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.673.337a4 4 0 01-2.5.5L6.336 15.5a2 2 0 01-1.92-1.277L3 10l3 3 3-3 3 3 3-3 3 3z"></path></svg>
                     </div>
                     <span className="text-xl font-black text-slate-800 tracking-tighter">DermAI</span>
                 </Link>
                 <div className="flex gap-4 text-sm font-bold">
-                    <Link to="/" className="text-slate-500 hover:text-indigo-600">药研中心</Link>
-                    <Link to="/target-id" className="text-slate-500 hover:text-indigo-600">靶点识别</Link>
-                    <Link to="/knowledge-graph" className="text-slate-500 hover:text-indigo-600">知识图谱</Link>
+                    <Link to="/" className="text-slate-500 hover:text-indigo-600 transition-colors">药研中心</Link>
+                    <Link to="/target-id" className="text-slate-500 hover:text-indigo-600 transition-colors">靶点识别</Link>
                 </div>
             </nav>
         );
@@ -73,20 +86,20 @@
                     <Navbar />
                     <main className="flex-1">
                         <Routes>
-                            <Route path="/" element={<RemoteComponent path="Dashboard" />} />
-                            <Route path="/target-id" element={<RemoteComponent path="TargetID" />} />
-                            <Route path="/knowledge-graph" element={<RemoteComponent path="KnowledgeGraph" />} />
-                            <Route path="*" element={<RemoteComponent path="Dashboard" />} />
+                            <Route path="/" element={<PageLoader name="Dashboard" />} />
+                            <Route path="/target-id" element={<PageLoader name="TargetID" />} />
+                            <Route path="*" element={<PageLoader name="Dashboard" />} />
                         </Routes>
                     </main>
                     <footer className="bg-white border-t border-slate-100 py-4 text-center">
-                        <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">© 2026 DermAI DATA EMPOWERMENT</p>
+                        <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">© 2026 DermAI Data Empowerment Department</p>
                     </footer>
                 </div>
             </HashRouter>
         );
 
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
