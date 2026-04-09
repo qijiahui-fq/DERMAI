@@ -23,27 +23,70 @@
 <body>
     <div id="root"></div>
 
-    <script type="text/babel">
+    <script type="text/babel" data-presets="react,typescript">
         import React from 'react';
         import ReactDOM from 'react-dom/client';
+        import { HashRouter, Routes, Route, Link } from 'react-router-dom';
+        import { Beaker } from 'lucide-react';
 
-        // 引入 App.jsx 的方式改为尝试性引入，强制 Babel 处理它
-        async function init() {
-            try {
-                // 动态导入我们的 App.jsx
-                const AppMod = await import('./App.jsx');
-                const App = AppMod.default;
-                
-                const root = ReactDOM.createRoot(document.getElementById('root'));
-                root.render(<App />);
-                console.log("DermAI: System successfully bypassed MIME check and rendered.");
-            } catch (err) {
-                console.error("DermAI Bootstrap Error:", err);
-                document.getElementById('root').innerHTML = `<div class="p-10 text-red-500">系统启动失败，请检查文件路径或刷新页面。</div>`;
-            }
-        }
+        // 🚀 核心逻辑：既然浏览器不认文件，我们用动态 fetch 强行抓取你的业务页面
+        // 这样 Babel 会绕过控制台的 MIME 检查，直接处理文本
+        const RemoteComponent = ({ path }) => {
+            const [Comp, setComp] = React.useState(null);
+            React.useEffect(() => {
+                fetch(`./pages/${path}.jsx`)
+                    .then(res => res.text())
+                    .then(code => {
+                        // 使用 Babel 手动翻译抓取到的代码
+                        const transformed = Babel.transform(code, { presets: ['react', 'typescript'] }).code;
+                        const exports = {};
+                        const module = { exports };
+                        // 暴力执行，注入环境
+                        new Function('React', 'exports', 'module', transformed)(React, exports, module);
+                        setComp(() => module.exports.default || module.exports);
+                    })
+                    .catch(err => console.error("Loading Error:", err));
+            }, [path]);
 
-        init();
+            return Comp ? <Comp /> : <div className="p-20 text-center animate-pulse text-indigo-500 font-bold">DermAI 正在调取数据模型...</div>;
+        };
+
+        const Navbar = () => (
+            <nav className="bg-white border-b border-slate-200 sticky top-0 z-50 px-6 flex justify-between h-16 items-center shadow-sm">
+                <Link to="/" className="flex items-center gap-2 group">
+                    <div className="p-2 bg-indigo-600 rounded-lg text-white group-hover:rotate-12 transition-transform shadow-md">
+                        <Beaker size={20} />
+                    </div>
+                    <span className="text-xl font-black text-slate-800 tracking-tighter">DermAI</span>
+                </Link>
+                <div className="flex gap-4 text-sm font-bold">
+                    <Link to="/" className="text-slate-500 hover:text-indigo-600">药研中心</Link>
+                    <Link to="/target-id" className="text-slate-500 hover:text-indigo-600">靶点识别</Link>
+                    <Link to="/knowledge-graph" className="text-slate-500 hover:text-indigo-600">知识图谱</Link>
+                </div>
+            </nav>
+        );
+
+        const App = () => (
+            <HashRouter>
+                <div className="min-h-screen bg-slate-50 flex flex-col">
+                    <Navbar />
+                    <main className="flex-1">
+                        <Routes>
+                            <Route path="/" element={<RemoteComponent path="Dashboard" />} />
+                            <Route path="/target-id" element={<RemoteComponent path="TargetID" />} />
+                            <Route path="/knowledge-graph" element={<RemoteComponent path="KnowledgeGraph" />} />
+                            <Route path="*" element={<RemoteComponent path="Dashboard" />} />
+                        </Routes>
+                    </main>
+                    <footer className="bg-white border-t border-slate-100 py-4 text-center">
+                        <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">© 2026 DermAI DATA EMPOWERMENT</p>
+                    </footer>
+                </div>
+            </HashRouter>
+        );
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
 </html>
